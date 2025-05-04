@@ -1,4 +1,4 @@
-name: Build Windows Tray App
+name: Build Virtual Mic
 
 on: [push]
 
@@ -16,7 +16,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install nuitka==1.8.6 zstandard sounddevice
+        pip install nuitka==1.8.6 sounddevice==0.4.6
         choco install -y mingw --version=12.2.0
         
     - name: Setup MinGW
@@ -24,16 +24,15 @@ jobs:
         echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
         
     - name: Compile with Nuitka
-      shell: cmd  # 关键修改：强制使用CMD而不是PowerShell
+      shell: cmd
       run: |
-        nuitka --mingw64 --standalone --onefile --windows-disable-console ^
-         --plugin-enable=pylint-warnings --plugin-enable=tk-inter ^
-         --include-data-file=C:/Windows/Fonts/seguiemj.ttf=seguiemj.ttf ^
-         --include-package=PIL ^
-         --output-dir=dist virtual_mic.py
+        nuitka --mingw64 --onefile --windows-disable-console ^
+        --plugin-enable=tk-inter ^
+        --include-module=sounddevice._sounddevice ^
+        --output-dir=dist virtual_mic.py
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: VirtualMic_Tray
+        name: VirtualMic
         path: dist/virtual_mic.exe
