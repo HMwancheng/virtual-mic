@@ -19,7 +19,7 @@
 ⚠️ 需提前在系统声音设置中启用 立体声混音（Windows）或 Monitor of Sound（Linux）
 
 ## Linux/macOS适配
-# 在create_emoji_icon()中添加：
+**在create_emoji_icon()中添加：**
    ```python
 elif sys.platform == 'darwin':  # macOS
     font_path = "/System/Library/Fonts/Apple Color Emoji.ttf"
