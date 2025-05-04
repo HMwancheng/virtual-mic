@@ -22,7 +22,7 @@ jobs:
           pyinstaller --onefile --name virtual-mic --log-level=ERROR virtual_mic.py
           
       - name: Upload artifact
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: virtual-mic
           path: dist/virtual-mic.exe
