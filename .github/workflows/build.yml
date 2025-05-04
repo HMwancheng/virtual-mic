@@ -28,7 +28,7 @@ jobs:
       run: |
         nuitka --mingw64 --onefile --windows-disable-console ^
         --plugin-enable=tk-inter ^
-        --include-module=sounddevice._sounddevice ^
+        --include-module=sounddevice ^
         --output-dir=dist virtual_mic.py
         
     - name: Upload Artifact
