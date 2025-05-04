@@ -24,12 +24,13 @@ jobs:
         echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
         
     - name: Compile with Nuitka
+      shell: cmd  # 关键修改：强制使用CMD而不是PowerShell
       run: |
         nuitka --mingw64 --standalone --onefile --windows-disable-console ^
-          --plugin-enable=tk-inter --plugin-enable=sounddevice ^
-          --include-data-file=mic.ico=mic.ico ^
-          --windows-icon-from-ico=mic.ico ^
-          --output-dir=dist virtual_mic.py
+        --plugin-enable=tk-inter --plugin-enable=sounddevice ^
+        --include-data-file=mic.ico=mic.ico ^
+        --windows-icon-from-ico=mic.ico ^
+        --output-dir=dist virtual_mic.py
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
