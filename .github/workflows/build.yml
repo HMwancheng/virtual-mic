@@ -28,19 +28,20 @@ jobs:
           path: dist/virtual-mic.exe
           if-no-files-found: error
 
-- name: Create Release
-  if: success()  # 确保只在构建成功时创建
-  uses: softprops/action-gh-release@v1  # 使用创建Release的action
-  with:
-    name: "Virtual Mic ${{ github.run_number }}"  # Release名称包含构建号
-    tag_name: v0.0.${{ github.run_number }}  # 自动递增的版本号
-    body: |  # 支持Markdown格式的说明
-      ## 虚拟麦克风程序
-      - 版本: ${{ github.run_number }}
-      - 构建时间: ${{ github.run_attempt }}
-      - 使用方法: [参考README](https://github.com/your/repo)
-    files: |  # 可以指定多个文件
-      dist/virtual-mic.exe
-      README.md
-    draft: false  # 直接发布
-    prerelease: false  # 不是预发布版
+      # 添加自动创建 Release 的步骤
+      - name: Create Release
+        if: success()  # 确保只在构建成功时创建
+        uses: softprops/action-gh-release@v1  # 使用创建Release的action
+        with:
+          name: "Virtual Mic ${{ github.run_number }}"  # Release名称包含构建号
+          tag_name: v1.0.${{ github.run_number }}  # 自动递增的版本号
+          body: |  # 支持Markdown格式的说明
+            ## 虚拟麦克风程序
+            - 版本: ${{ github.run_number }}
+            - 构建时间: ${{ github.run_attempt }}
+            - 使用方法: [参考README](https://github.com/your/repo)
+          files: |  # 可以指定多个文件
+            dist/virtual-mic.exe
+            README.md
+          draft: false  # 直接发布
+          prerelease: false  # 不是预发布版
