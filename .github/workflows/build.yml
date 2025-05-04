@@ -1,6 +1,6 @@
-name: Build EXE with Nuitka
+name: Build Windows Tray App
 
-on: [push, release]
+on: [push]
 
 jobs:
   build:
@@ -14,29 +14,17 @@ jobs:
       with:
         python-version: '3.10'
     
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install nuitka zstandard sounddevice
-        choco install upx
-        
-    - name: Build with Nuitka
+    - name: Install Nuitka
+      run: pip install nuitka zstandard
+    
+    - name: Compile with Nuitka
       run: |
         nuitka --onefile --windows-disable-console --plugin-enable=sounddevice ^
-        --include-data-file=C:/Windows/Fonts/seguiemj.ttf=seguiemj.ttf ^
+        --windows-icon-from-ico=mic.ico ^
         --remove-output --output-dir=dist virtual_mic.py
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: VirtualMic
+        name: VirtualMic_Tray
         path: dist/virtual_mic.exe
-        if-no-files-found: error
-        
-    - name: Create Release
-      if: github.event_name == 'push'
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist/virtual_mic.exe
-        tag_name: v0.1.${{ github.run_number }}
-        draft: false
