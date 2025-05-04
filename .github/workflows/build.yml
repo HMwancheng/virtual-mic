@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build:
-    runs-on: windows-latest  # 使用微软官方预装VS2022的镜像
+    runs-on: windows-latest
     
     steps:
     - uses: actions/checkout@v4
@@ -16,16 +16,18 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install nuitka zstandard sounddevice
-        choco install -y upx
+        pip install nuitka==1.8.6 zstandard sounddevice
+        choco install -y mingw --version=12.2.0
         
-    - name: Compile with Nuitka (MinGW)
-      env:
-        # 使用预装的MinGW
-        PATH: ${{ github.workspace }}/mingw64/bin;${{ env.PATH }}
+    - name: Setup MinGW
       run: |
-        nuitka --mingw64 --onefile --windows-disable-console ^
-          --plugin-enable=sounddevice ^
+        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
+        
+    - name: Compile with Nuitka
+      run: |
+        nuitka --mingw64 --standalone --onefile --windows-disable-console ^
+          --plugin-enable=tk-inter --plugin-enable=sounddevice ^
+          --include-data-file=mic.ico=mic.ico ^
           --windows-icon-from-ico=mic.ico ^
           --output-dir=dist virtual_mic.py
         
