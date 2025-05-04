@@ -20,6 +20,7 @@
 
 ## Linux/macOS适配
 # 在create_emoji_icon()中添加：
+   ```python
 elif sys.platform == 'darwin':  # macOS
     font_path = "/System/Library/Fonts/Apple Color Emoji.ttf"
 elif sys.platform == 'linux':
