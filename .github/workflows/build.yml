@@ -1,0 +1,28 @@
+name: Build EXE
+on: [push]  # 每次推送代码时自动运行
+
+jobs:
+  build:
+    runs-on: windows-latest  # 使用 Windows 环境
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # 下载仓库代码
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # 指定 Python 版本
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller sounddevice numpy  # 安装依赖
+
+      - name: Build EXE
+        run: |
+          pyinstaller --onefile virtual_mic.py  # 打包成单个 EXE
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v3
+        with:
+          name: virtual-mic.exe
+          path: dist/virtual_mic.exe  # 上传生成的 EXE
