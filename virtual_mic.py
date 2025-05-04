@@ -1,56 +1,84 @@
 import sounddevice as sd
 import numpy as np
+import pystray
+import threading
+import sys
+import os
+from PIL import Image, ImageDraw, ImageFont
 
-def print_devices():
-    """打印所有可用的音频设备"""
-    print("可用的音频设备：")
-    devices = sd.query_devices()
-    for i, device in enumerate(devices):
-        print(f"{i}: {device['name']} (输入通道: {device['max_input_channels']}, 输出通道: {device['max_output_channels']})")
-
-def find_vb_cable():
-    """查找VB-CABLE设备索引"""
-    devices = sd.query_devices()
-    for i, device in enumerate(devices):
-        if "CABLE Input" in device["name"] and device["max_input_channels"] > 0:
-            return i
-    return None
-
-print_devices()  # 打印可用设备
-
-# 自动查找VB-CABLE设备
-vb_cable_index = find_vb_cable()
-if vb_cable_index is None:
-    print("\n错误：未找到VB-CABLE设备！请确保已安装VB-CABLE驱动。")
-    print("可以从 https://vb-audio.com/Cable/ 下载安装")
-    exit(1)
-
-# 获取默认输入设备(物理麦克风)
-default_input = sd.default.device[0]
-
-print(f"\n使用设备配置：")
-print(f"输入设备: {sd.query_devices(default_input)['name']}")
-print(f"输出设备(VB-CABLE): {sd.query_devices(vb_cable_index)['name']}")
-
-def callback(indata, outdata, frames, time, status):
-    """音频回调函数，将输入直接转发到输出"""
-    if status:
-        print(f"音频状态: {status}")
-    outdata[:] = indata  # 转发音频数据
-
-try:
-    print("\n🎤 虚拟麦克风正在运行... (按Ctrl+C停止)")
-    with sd.Stream(
-        device=(default_input, vb_cable_index),  # 输入→输出设备
-        channels=1,          # 单声道
-        callback=callback,
-        samplerate=44100,    # 采样率
-        blocksize=1024       # 缓冲区大小
-    ):
-        while True:
-            sd.sleep(1000)  # 持续运行
+class VirtualMic:
+    def __init__(self):
+        self.running = True
+        
+    def audio_loop(self):
+        """音频转发主逻辑"""
+        def callback(indata, outdata, frames, time, status):
+            outdata[:] = indata  # 直接转发音频数据
             
-except KeyboardInterrupt:
-    print("\n停止虚拟麦克风")
-except Exception as e:
-    print(f"发生错误: {e}")
+        with sd.Stream(
+            device=(sd.default.device[0], self.find_vb_cable()),
+            channels=1,
+            callback=callback,
+            samplerate=44100
+        ):
+            while self.running:
+                sd.sleep(1000)
+    
+    def find_vb_cable(self):
+        """查找VB-CABLE设备索引"""
+        devices = sd.query_devices()
+        for i, device in enumerate(devices):
+            if "CABLE Input" in device["name"] and device["max_input_channels"] > 0:
+                return i
+        return None
+    
+    def create_emoji_icon(self):
+        """生成🎤表情托盘图标"""
+        # 创建透明背景图像
+        image = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        
+        try:
+            # Windows系统Emoji字体路径
+            font_path = "C:/Windows/Fonts/seguiemj.ttf"  
+            font = ImageFont.truetype(font_path, 50)
+        except:
+            # 备用方案：使用默认字体（可能显示为方框）
+            try:
+                font = ImageFont.truetype("arial.ttf", 50)
+            except:
+                font = ImageFont.load_default()
+        
+        # 绘制🎤表情（居中）
+        draw.text((12, 5), "🎤", font=font, fill="white")
+        return image
+    
+    def create_tray(self):
+        """创建系统托盘图标"""
+        menu = pystray.Menu(
+            pystray.MenuItem("退出", self.stop)
+        )
+        self.icon = pystray.Icon(
+            "virtual_mic",
+            icon=self.create_emoji_icon(),
+            title="虚拟麦克风",
+            menu=menu
+        )
+        self.icon.run()
+    
+    def stop(self):
+        """安全退出程序"""
+        self.running = False
+        self.icon.stop()
+        sys.exit(0)
+
+if __name__ == "__main__":
+    # Windows隐藏控制台窗口
+    if sys.platform == 'win32':
+        import ctypes
+        ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+    
+    # 启动程序
+    vm = VirtualMic()
+    threading.Thread(target=vm.audio_loop, daemon=True).start()  # 音频线程
+    vm.create_tray()  # 托盘主线程
