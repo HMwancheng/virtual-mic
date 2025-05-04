@@ -1,86 +1,111 @@
-import sounddevice as sd
 import sys
+import os
 import ctypes
 import threading
 from ctypes import wintypes
 
-# Windows API 定义
-NOTIFYICONDATA = ctypes.c_ulong, wintypes.HWND, wintypes.UINT, wintypes.UINT, 
-                wintypes.HICON, wintypes.WCHAR * 64
+# --- MinGW 兼容性补丁 ---
+if sys.platform == "win32":
+    # 解决MinGW环境下ctypes类型缺失问题
+    if not hasattr(wintypes, 'LPDWORD'):
+        wintypes.LPDWORD = ctypes.POINTER(wintypes.DWORD)
+    
+    # 打包后PATH处理
+    if hasattr(sys, '_MEIPASS'):
+        os.environ['PATH'] = sys._MEIPASS + ';' + os.environ['PATH']
 
-class VirtualMic:
+# --- Windows API 定义 ---
+class NOTIFYICONDATA(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("hWnd", wintypes.HWND),
+        ("uID", wintypes.UINT),
+        ("uFlags", wintypes.UINT),
+        ("uCallbackMessage", wintypes.UINT),
+        ("hIcon", wintypes.HICON),
+        ("szTip", wintypes.WCHAR * 64),
+        ("dwState", wintypes.DWORD),
+        ("dwStateMask", wintypes.DWORD),
+        ("szInfo", wintypes.WCHAR * 256),
+        ("uTimeout", wintypes.UINT),
+    ]
+
+# --- 音频处理核心 ---
+def audio_loop():
+    """极简音频转发实现"""
+    import sounddevice as sd  # 延迟导入避免编译问题
+    
+    def callback(indata, outdata, frames, time, status):
+        outdata[:] = indata  # 原生Python实现，避免numpy依赖
+    
+    with sd.Stream(
+        channels=1,
+        callback=callback,
+        samplerate=44100,
+        blocksize=1024
+    ):
+        while getattr(sys, 'running', True):
+            sd.sleep(1000)
+
+# --- 托盘图标管理 ---
+class TrayManager:
     def __init__(self):
-        self.running = True
-        self._setup_windows_api()
-
-    def _setup_windows_api(self):
-        """初始化Windows托盘API"""
         self.shell32 = ctypes.windll.shell32
         self.user32 = ctypes.windll.user32
         
-        self.nid = NOTIFYICONDATA(
-            0,                          # cbSize
-            0,                          # hWnd
-            1000,                       # uID
-            0x2 | 0x4,                  # NIF_MESSAGE | NIF_ICON
-            0,                          # uCallbackMessage
-            0,                          # hIcon
-            "Virtual Mic"               # szTip
-        )
+        # 初始化NOTIFYICONDATA结构
+        self.nid = NOTIFYICONDATA()
         self.nid.cbSize = ctypes.sizeof(NOTIFYICONDATA)
-
-    def audio_loop(self):
-        """音频转发核心"""
-        def callback(indata, outdata, *_):
-            outdata[:] = indata
-            
-        with sd.Stream(
-            channels=1,
-            callback=callback,
-            samplerate=44100
-        ):
-            while self.running:
-                sd.sleep(1000)
-
-    def show_tray_icon(self):
+        self.nid.uFlags = 0x1 | 0x2  # NIF_ICON | NIF_MESSAGE
+        self.nid.szTip = "Virtual Mic\0"
+        
+        # 加载图标
+        if os.path.exists("mic.ico"):
+            self.nid.hIcon = self.user32.LoadImageW(
+                0, "mic.ico", 1, 0, 0, 0x10
+            )
+    
+    def show(self):
         """显示托盘图标"""
-        WM_LBUTTONDOWN = 0x0201
-        msg_map = {WM_LBUTTONDOWN: self._show_menu}
-        
-        # 创建消息循环
-        msg = wintypes.MSG()
-        while self.running:
-            if self.user32.PeekMessageW(ctypes.byref(msg), 0, 0, 0, 1):
-                if msg.message in msg_map:
-                    msg_map[msg.message]()
-                self.user32.TranslateMessage(ctypes.byref(msg))
-                self.user32.DispatchMessageW(ctypes.byref(msg))
+        self.shell32.Shell_NotifyIconW(0x0, ctypes.byref(self.nid))  # NIM_ADD
+    
+    def remove(self):
+        """移除托盘图标"""
+        self.shell32.Shell_NotifyIconW(0x2, ctypes.byref(self.nid))  # NIM_DELETE
 
-    def _show_menu(self):
-        """右键菜单"""
-        menu = self.user32.CreatePopupMenu()
-        self.user32.AppendMenuW(menu, 0x0, 1001, "退出")
-        
-        pos = wintypes.POINT()
-        self.user32.GetCursorPos(ctypes.byref(pos))
-        
-        self.user32.TrackPopupMenuEx(
-            menu, 0x100, pos.x, pos.y, self.nid.hWnd, None
-        )
-
-    def run(self):
-        """启动程序"""
-        # 隐藏控制台
-        self.user32.ShowWindow(
+# --- 主程序 ---
+def main():
+    # 隐藏控制台窗口
+    if sys.platform == "win32":
+        ctypes.windll.user32.ShowWindow(
             ctypes.windll.kernel32.GetConsoleWindow(), 0
         )
+    
+    # 启动音频线程
+    sys.running = True
+    audio_thread = threading.Thread(target=audio_loop, daemon=True)
+    audio_thread.start()
+    
+    # 显示托盘图标
+    if sys.platform == "win32":
+        tray = TrayManager()
+        tray.show()
         
-        # 启动音频线程
-        threading.Thread(target=self.audio_loop, daemon=True).start()
-        
-        # 显示托盘图标
-        self.show_tray_icon()
+        try:
+            # 消息循环
+            msg = wintypes.MSG()
+            while sys.running and self.user32.GetMessageW(ctypes.byref(msg), 0, 0, 0):
+                self.user32.TranslateMessage(ctypes.byref(msg))
+                self.user32.DispatchMessageW(ctypes.byref(msg))
+        finally:
+            tray.remove()
+    else:
+        import time
+        while sys.running:
+            time.sleep(1)
 
 if __name__ == "__main__":
-    vm = VirtualMic()
-    vm.run()
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.running = False
