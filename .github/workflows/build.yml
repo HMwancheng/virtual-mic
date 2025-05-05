@@ -1,4 +1,4 @@
-name: Build Virtual Mic
+name: Build with PyInstaller
 
 on: [push]
 
@@ -16,23 +16,18 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install nuitka==1.8.6 sounddevice==0.4.6
-        choco install -y mingw --version=12.2.0
+        pip install pyinstaller==5.13.0 sounddevice==0.4.6
+        choco install -y upx
         
-    - name: Setup MinGW
+    - name: Build with PyInstaller
       run: |
-        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
-        
-    - name: Compile with Nuitka
-      shell: cmd
-      run: |
-        nuitka --mingw64 --onefile --windows-disable-console ^
-        --plugin-enable=tk-inter ^
-        --include-module=sounddevice ^
-        --output-dir=dist virtual_mic.py
+        pyinstaller --onefile --windowed --clean ^
+          --add-binary "C:/Windows/Fonts/segoeuiemoji.ttf;." ^
+          --name VirtualMic ^
+          virtual_mic.py
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: VirtualMic
-        path: dist/virtual_mic.exe
+        path: dist/VirtualMic.exe
