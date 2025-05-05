@@ -1,6 +1,9 @@
-name: Build VirtualMic
+name: Build and Release VirtualMic
 
-on: [push]
+on:
+  push:
+    tags:
+      - 'v*'  # 触发发布规则：当推送v开头的tag时
 
 jobs:
   build:
@@ -17,7 +20,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install pyinstaller==5.13.0 
-        pip install sounddevice==0.4.6 --no-binary :all:
+        pip install sounddevice==0.4.6 numpy==1.24.4
         choco install -y upx
         
     - name: Build with PyInstaller
@@ -33,3 +36,19 @@ jobs:
       with:
         name: VirtualMic
         path: dist/VirtualMic.exe
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/v')
+      with:
+        files: |
+          dist/VirtualMic.exe
+        tag_name: ${{ github.ref }}
+        name: VirtualMic ${{ github.ref_name }}
+        body: |
+          ### 版本说明
+          - 支持音频设备切换
+          - 新增系统托盘菜单
+          - 优化内存占用
+        draft: false
+        prerelease: false
