@@ -1,4 +1,4 @@
-name: Build with PyInstaller
+name: Build VirtualMic
 
 on: [push]
 
@@ -20,10 +20,9 @@ jobs:
         choco install -y upx
         
     - name: Build with PyInstaller
-      shell: cmd  # 关键修改：强制使用CMD而不是PowerShell
+      shell: cmd
       run: |
         pyinstaller --onefile --windowed --clean ^
-        --add-binary "C:/Windows/Fonts/segoeuiemoji.ttf;." ^
         --name VirtualMic ^
         virtual_mic.py
         
