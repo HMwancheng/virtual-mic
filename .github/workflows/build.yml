@@ -16,13 +16,15 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install pyinstaller==5.13.0 sounddevice==0.4.6
+        pip install pyinstaller==5.13.0 
+        pip install sounddevice==0.4.6 --no-binary :all:
         choco install -y upx
         
     - name: Build with PyInstaller
       shell: cmd
       run: |
         pyinstaller --onefile --windowed --clean ^
+        --add-binary "C:/Windows/System32/msvcr120.dll;." ^
         --name VirtualMic ^
         virtual_mic.py
         
