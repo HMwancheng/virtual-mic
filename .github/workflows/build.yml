@@ -3,7 +3,7 @@ name: Build and Release VirtualMic
 on:
   push:
     tags:
-      - 'v*'  # 触发发布规则：当推送v开头的tag时
+      - 'v*'
 
 jobs:
   build:
@@ -19,15 +19,20 @@ jobs:
     
     - name: Install dependencies
       run: |
-        pip install pyinstaller==5.13.0 
-        pip install sounddevice==0.4.6 numpy==1.24.4
+        # 安装PortAudio库
+        choco install -y portaudio
+        
+        # 特殊安装sounddevice（包含二进制）
+        pip install sounddevice==0.4.6 --only-binary=:all:
+        pip install pyinstaller==5.13.0 numpy==1.24.4
         choco install -y upx
         
     - name: Build with PyInstaller
       shell: cmd
       run: |
         pyinstaller --onefile --windowed --clean ^
-        --add-binary "C:/Windows/System32/msvcr120.dll;." ^
+        --add-binary "C:\Program Files\PortAudio\lib\portaudio_x64.dll;." ^
+        --add-data "%LOCALAPPDATA%\Programs\Python\Python310\Lib\site-packages\_sounddevice_data;._sounddevice_data" ^
         --name VirtualMic ^
         virtual_mic.py
         
@@ -41,14 +46,4 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/v')
       with:
-        files: |
-          dist/VirtualMic.exe
-        tag_name: ${{ github.ref }}
-        name: VirtualMic ${{ github.ref_name }}
-        body: |
-          ### 版本说明
-          - 支持音频设备切换
-          - 新增系统托盘菜单
-          - 优化内存占用
-        draft: false
-        prerelease: false
+        files: dist/VirtualMic.exe
