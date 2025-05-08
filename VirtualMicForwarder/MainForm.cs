@@ -8,23 +8,22 @@ namespace VirtualMicForwarder
 {
     public partial class MainForm : Form
     {
-        // 可空字段声明
         private NotifyIcon? trayIcon;
         private ContextMenuStrip? trayMenu;
         private WasapiCapture? audioInput;
         private WasapiOut? audioOutput;
+        private bool isExiting = false; // 新增退出状态标志
 
         public MainForm()
         {
             InitializeTrayIcon();
             InitializeAudioDevices();
+            Application.ApplicationExit += OnApplicationExit; // 注册全局退出事件
         }
 
         private void InitializeTrayIcon()
         {
             trayMenu = new ContextMenuStrip();
-            
-            // 添加菜单项（带图标占位符）
             trayMenu.Items.Add("Select Input", null, OnSelectInput);
             trayMenu.Items.Add("Exit", null, OnExit);
 
@@ -35,50 +34,68 @@ namespace VirtualMicForwarder
                 ContextMenuStrip = trayMenu,
                 Visible = true
             };
+
+            // 添加双击打开事件
+            trayIcon.DoubleClick += (s, e) => Visible = !Visible;
         }
 
         private void InitializeAudioDevices()
         {
-            // 安全检查设备存在性
-            var inputDevices = new MMDeviceEnumerator()
-                .EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-            
-            if (inputDevices.Count > 0)
+            try
             {
+                var inputDevices = new MMDeviceEnumerator()
+                    .EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+
+                if (inputDevices.Count == 0)
+                {
+                    ShowWarning("No active input devices found!");
+                    return;
+                }
+
                 StartForwarding(inputDevices[0]);
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("No active input devices found!", "Warning", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowError($"Audio initialization failed: {ex.Message}");
             }
         }
 
         private void StartForwarding(MMDevice inputDevice)
         {
-            // 清理旧资源
-            audioInput?.StopRecording();
-            audioOutput?.Stop();
-            audioInput?.Dispose();
-            audioOutput?.Dispose();
-
-            // 初始化新设备
-            audioInput = new WasapiCapture(inputDevice);
-            audioOutput = new WasapiOut(AudioClientShareMode.Shared, 100);
-
-            var provider = new BufferedWaveProvider(audioInput.WaveFormat);
-            audioOutput.Init(provider);
-
-            audioInput.DataAvailable += (s, e) =>
+            try
             {
-                provider.AddSamples(e.Buffer, 0, e.BytesRecorded);
-            };
+                audioInput?.StopRecording();
+                audioOutput?.Stop();
+                audioInput?.Dispose();
+                audioOutput?.Dispose();
 
-            audioInput.StartRecording();
-            audioOutput.Play();
+                audioInput = new WasapiCapture(inputDevice);
+                audioOutput = new WasapiOut(AudioClientShareMode.Shared, 100);
+
+                var provider = new BufferedWaveProvider(audioInput.WaveFormat);
+                audioOutput.Init(provider);
+
+                audioInput.DataAvailable += (s, e) =>
+                {
+                    try
+                    {
+                        provider.AddSamples(e.Buffer, 0, e.BytesRecorded);
+                    }
+                    catch (Exception ex)
+                    {
+                        ShowError($"Audio processing error: {ex.Message}");
+                    }
+                };
+
+                audioInput.StartRecording();
+                audioOutput.Play();
+            }
+            catch (Exception ex)
+            {
+                ShowError($"Failed to start audio forwarding: {ex.Message}");
+            }
         }
 
-        // 修改参数类型为可空
         private void OnSelectInput(object? sender, EventArgs e)
         {
             using var dialog = new DeviceSelectorForm(DataFlow.Capture);
@@ -88,16 +105,23 @@ namespace VirtualMicForwarder
             }
         }
 
-        // 修改参数类型为可空
         private void OnExit(object? sender, EventArgs e)
+        {
+            if (!isExiting)
+            {
+                isExiting = true;
+                Application.Exit();
+            }
+        }
+
+        private void OnApplicationExit(object? sender, EventArgs e)
         {
             audioInput?.StopRecording();
             audioOutput?.Stop();
             audioInput?.Dispose();
             audioOutput?.Dispose();
-            
+            trayIcon?.Visible = false;
             trayIcon?.Dispose();
-            Application.Exit();
         }
 
         protected override void OnLoad(EventArgs e)
@@ -107,17 +131,27 @@ namespace VirtualMicForwarder
             base.OnLoad(e);
         }
 
-        // 重写Dispose方法确保资源释放
-        protected override void Dispose(bool disposing)
+        // 防止窗体关闭导致程序退出
+        protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (disposing)
+            if (!isExiting)
             {
-                audioInput?.Dispose();
-                audioOutput?.Dispose();
-                trayIcon?.Dispose();
-                trayMenu?.Dispose();
+                e.Cancel = true;
+                Visible = false;
             }
-            base.Dispose(disposing);
+            base.OnFormClosing(e);
+        }
+
+        private void ShowWarning(string message)
+        {
+            MessageBox.Show(message, "Warning", 
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void ShowError(string message)
+        {
+            MessageBox.Show(message, "Error", 
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }
