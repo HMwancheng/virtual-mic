@@ -120,7 +120,10 @@ namespace VirtualMicForwarder
             audioOutput?.Stop();
             audioInput?.Dispose();
             audioOutput?.Dispose();
-            trayIcon?.Visible = false;
+            if (trayIcon != null)
+            {
+                trayIcon.Visible = false;
+            }
             trayIcon?.Dispose();
         }
 
