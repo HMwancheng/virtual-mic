@@ -10,7 +10,7 @@ namespace VirtualMicForwarder
         [STAThread]
         static void Main()
         {
-            // 新增管理员权限检查
+            // 管理员权限检查
             if (!IsRunningAsAdmin())
             {
                 RestartAsAdmin();
@@ -26,7 +26,6 @@ namespace VirtualMicForwarder
             Application.Run(new MainForm());
         }
 
-        // 新增权限检查方法
         private static bool IsRunningAsAdmin()
         {
             using var identity = WindowsIdentity.GetCurrent();
@@ -34,7 +33,6 @@ namespace VirtualMicForwarder
             return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
 
-        // 新增提权启动方法
         private static void RestartAsAdmin()
         {
             var exePath = Process.GetCurrentProcess().MainModule.FileName;
@@ -42,7 +40,7 @@ namespace VirtualMicForwarder
             {
                 FileName = exePath,
                 UseShellExecute = true,
-                Verb = "runas" // 请求管理员权限
+                Verb = "runas"
             };
 
             try
@@ -51,13 +49,20 @@ namespace VirtualMicForwarder
             }
             catch (System.ComponentModel.Win32Exception)
             {
-                MessageBox.Show("必须使用管理员权限运行本程序！", "权限错误", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("必须使用管理员权限运行本程序！", 
+                    "权限错误", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Error);
             }
             Environment.Exit(0);
         }
 
-        // 错误显示方法保持不变
-        static void ShowError(string title, Exception ex) { /* 原有代码 */ }
+        static void ShowError(string title, Exception ex)
+        {
+            MessageBox.Show($"严重错误：{ex?.Message ?? "未知错误"}", 
+                title, 
+                MessageBoxButtons.OK, 
+                MessageBoxIcon.Error);
+        }
     }
 }
