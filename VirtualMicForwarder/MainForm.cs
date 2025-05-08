@@ -8,10 +8,11 @@ namespace VirtualMicForwarder
 {
     public partial class MainForm : Form
     {
-        private NotifyIcon trayIcon;
-        private ContextMenuStrip trayMenu;
-        private WasapiCapture audioInput;
-        private WasapiOut audioOutput;
+        // 可空字段声明
+        private NotifyIcon? trayIcon;
+        private ContextMenuStrip? trayMenu;
+        private WasapiCapture? audioInput;
+        private WasapiOut? audioOutput;
 
         public MainForm()
         {
@@ -22,6 +23,8 @@ namespace VirtualMicForwarder
         private void InitializeTrayIcon()
         {
             trayMenu = new ContextMenuStrip();
+            
+            // 添加菜单项（带图标占位符）
             trayMenu.Items.Add("Select Input", null, OnSelectInput);
             trayMenu.Items.Add("Exit", null, OnExit);
 
@@ -36,20 +39,30 @@ namespace VirtualMicForwarder
 
         private void InitializeAudioDevices()
         {
-            // 自动选择第一个可用输入设备
+            // 安全检查设备存在性
             var inputDevices = new MMDeviceEnumerator()
                 .EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+            
             if (inputDevices.Count > 0)
             {
                 StartForwarding(inputDevices[0]);
+            }
+            else
+            {
+                MessageBox.Show("No active input devices found!", "Warning", 
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
         private void StartForwarding(MMDevice inputDevice)
         {
+            // 清理旧资源
             audioInput?.StopRecording();
             audioOutput?.Stop();
+            audioInput?.Dispose();
+            audioOutput?.Dispose();
 
+            // 初始化新设备
             audioInput = new WasapiCapture(inputDevice);
             audioOutput = new WasapiOut(AudioClientShareMode.Shared, 100);
 
@@ -65,20 +78,25 @@ namespace VirtualMicForwarder
             audioOutput.Play();
         }
 
-        private void OnSelectInput(object sender, EventArgs e)
+        // 修改参数类型为可空
+        private void OnSelectInput(object? sender, EventArgs e)
         {
-            var dialog = new DeviceSelectorForm(DataFlow.Capture);
-            if (dialog.ShowDialog() == DialogResult.OK)
+            using var dialog = new DeviceSelectorForm(DataFlow.Capture);
+            if (dialog.ShowDialog() == DialogResult.OK && dialog.SelectedDevice != null)
             {
                 StartForwarding(dialog.SelectedDevice);
             }
         }
 
-        private void OnExit(object sender, EventArgs e)
+        // 修改参数类型为可空
+        private void OnExit(object? sender, EventArgs e)
         {
+            audioInput?.StopRecording();
+            audioOutput?.Stop();
             audioInput?.Dispose();
             audioOutput?.Dispose();
-            trayIcon.Dispose();
+            
+            trayIcon?.Dispose();
             Application.Exit();
         }
 
@@ -87,6 +105,19 @@ namespace VirtualMicForwarder
             Visible = false;
             ShowInTaskbar = false;
             base.OnLoad(e);
+        }
+
+        // 重写Dispose方法确保资源释放
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                audioInput?.Dispose();
+                audioOutput?.Dispose();
+                trayIcon?.Dispose();
+                trayMenu?.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 }
